@@ -1,206 +1,24 @@
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Tag, Folder, LogOut } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { Plus, Search, Folder, LogOut } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
-
-interface Bookmark {
-  id: number;
-  title: string;
-  url: string;
-  description: string | null;
-  folder_id: number | null;
-  folder?: {
-    id: number;
-    name: string;
-  } | null;
-}
-
-interface FormData {
-  title: string;
-  url: string;
-  description: string;
-  folder_id: number | null;
-  tags: string;
-}
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
+import { useBookmarks, Bookmark } from '@/hooks/useBookmarks';
+import { BookmarkDialog } from '@/components/BookmarkDialog';
+import { BookmarkList } from '@/components/BookmarkList';
 
 export default function Index() {
-  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
-  const [folders, setFolders] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFolder, setSelectedFolder] = useState<'all' | number>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingBookmark, setEditingBookmark] = useState<Bookmark | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [formData, setFormData] = useState<FormData>({
-    title: '',
-    url: '',
-    description: '',
-    folder_id: null,
-    tags: ''
-  });
-
-  const fetchData = async () => {
-    try {
-      // Fetch folders
-      const { data: foldersData, error: foldersError } = await supabase
-        .from('folders')
-        .select('*')
-        .order('name');
-
-      if (foldersError) throw foldersError;
-      setFolders(foldersData || []);
-
-      // Fetch bookmarks with their folder info
-      const { data: bookmarksData, error: bookmarksError } = await supabase
-        .from('bookmarks')
-        .select(`
-          *,
-          folder:folders(*)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (bookmarksError) throw bookmarksError;
-      setBookmarks(bookmarksData || []);
-    } catch (error: any) {
-      toast({
-        title: "Error fetching data",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-
-    // Set up realtime subscriptions
-    const channel = supabase
-      .channel('schema-db-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'bookmarks'
-        },
-        (payload) => {
-          console.log('Bookmark change received:', payload);
-          fetchData();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'folders'
-        },
-        (payload) => {
-          console.log('Folder change received:', payload);
-          fetchData();
-        }
-      )
-      .subscribe((status) => {
-        console.log('Subscription status:', status);
-      });
-
-    return () => {
-      console.log('Cleaning up subscription');
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const bookmarkData = {
-        title: formData.title,
-        url: formData.url,
-        description: formData.description || null,
-        folder_id: formData.folder_id,
-      };
-
-      if (editingBookmark) {
-        const { error } = await supabase
-          .from('bookmarks')
-          .update(bookmarkData)
-          .eq('id', editingBookmark.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('bookmarks')
-          .insert([bookmarkData]);
-        if (error) throw error;
-      }
-
-      handleDialogClose();
-      toast({
-        title: editingBookmark ? "Bookmark updated" : "Bookmark added",
-        description: "Your bookmark has been saved successfully.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDelete = async (bookmarkId: number) => {
-    if (window.confirm('Are you sure you want to delete this bookmark?')) {
-      try {
-        const { error } = await supabase
-          .from('bookmarks')
-          .delete()
-          .eq('id', bookmarkId);
-        
-        if (error) throw error;
-
-        toast({
-          title: "Bookmark deleted",
-          description: "The bookmark has been removed successfully.",
-        });
-      } catch (error: any) {
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive",
-        });
-      }
-    }
-  };
-
-  const handleEdit = (bookmark: Bookmark) => {
-    setEditingBookmark(bookmark);
-    setFormData({
-      title: bookmark.title,
-      url: bookmark.url,
-      description: bookmark.description || '',
-      folder_id: bookmark.folder_id,
-      tags: ''
-    });
-    setIsDialogOpen(true);
-  };
-
-  const handleDialogClose = () => {
-    setIsDialogOpen(false);
-    setEditingBookmark(null);
-    setFormData({
-      title: '',
-      url: '',
-      description: '',
-      folder_id: null,
-      tags: ''
-    });
-  };
+  const { bookmarks, folders } = useBookmarks();
 
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();
@@ -213,6 +31,11 @@ export default function Index() {
     } else {
       navigate("/auth");
     }
+  };
+
+  const handleDialogClose = () => {
+    setIsDialogOpen(false);
+    setEditingBookmark(null);
   };
 
   const filteredBookmarks = bookmarks.filter((bookmark: Bookmark) => {
@@ -238,64 +61,12 @@ export default function Index() {
         </div>
       </div>
 
-      <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>{editingBookmark ? 'Edit Bookmark' : 'Add New Bookmark'}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Title</label>
-              <Input
-                required
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="Enter bookmark title"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">URL</label>
-              <Input
-                required
-                value={formData.url}
-                onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                placeholder="Enter URL"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Description</label>
-              <Input
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Enter description"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Folder</label>
-              <select
-                className="w-full p-2 border rounded-md"
-                value={formData.folder_id || ''}
-                onChange={(e) => setFormData({ ...formData, folder_id: e.target.value ? Number(e.target.value) : null })}
-              >
-                <option value="">No folder</option>
-                {folders.map((folder: any) => (
-                  <option key={folder.id} value={folder.id}>
-                    {folder.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={handleDialogClose}>
-                Cancel
-              </Button>
-              <Button type="submit">
-                {editingBookmark ? 'Update' : 'Create'}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <BookmarkDialog
+        isOpen={isDialogOpen}
+        onClose={handleDialogClose}
+        editingBookmark={editingBookmark}
+        folders={folders}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* Sidebar */}
@@ -347,55 +118,13 @@ export default function Index() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {filteredBookmarks.map((bookmark: Bookmark) => (
-                  <Card key={bookmark.id} className="p-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-medium">{bookmark.title}</h3>
-                        <a 
-                          href={bookmark.url} 
-                          className="text-sm text-blue-500 hover:underline"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {bookmark.url}
-                        </a>
-                        <p className="text-sm text-gray-500 mt-1">{bookmark.description}</p>
-                        {bookmark.folder && (
-                          <div className="mt-2">
-                            <span className="text-xs bg-gray-100 px-2 py-1 rounded-full">
-                              {bookmark.folder.name}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => handleEdit(bookmark)}
-                        >
-                          Edit
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="text-red-500 hover:text-red-700"
-                          onClick={() => handleDelete(bookmark.id)}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-                {filteredBookmarks.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
-                    No bookmarks found. Try adjusting your search or folder filter.
-                  </div>
-                )}
-              </div>
+              <BookmarkList 
+                bookmarks={filteredBookmarks}
+                onEdit={(bookmark) => {
+                  setEditingBookmark(bookmark);
+                  setIsDialogOpen(true);
+                }}
+              />
             </CardContent>
           </Card>
         </div>

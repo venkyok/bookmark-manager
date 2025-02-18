@@ -51,7 +51,8 @@ export default function Index() {
       // Fetch folders
       const { data: foldersData, error: foldersError } = await supabase
         .from('folders')
-        .select('*');
+        .select('*')
+        .order('name');
 
       if (foldersError) throw foldersError;
       setFolders(foldersData || []);
@@ -62,7 +63,8 @@ export default function Index() {
         .select(`
           *,
           folder:folders(*)
-        `);
+        `)
+        .order('created_at', { ascending: false });
 
       if (bookmarksError) throw bookmarksError;
       setBookmarks(bookmarksData || []);
@@ -79,19 +81,34 @@ export default function Index() {
     fetchData();
 
     // Set up realtime subscriptions
-    const bookmarksSubscription = supabase
-      .channel('bookmarks_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookmarks' }, fetchData)
-      .subscribe();
-
-    const foldersSubscription = supabase
-      .channel('folders_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'folders' }, fetchData)
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bookmarks'
+        },
+        () => {
+          fetchData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'folders'
+        },
+        () => {
+          fetchData();
+        }
+      )
       .subscribe();
 
     return () => {
-      bookmarksSubscription.unsubscribe();
-      foldersSubscription.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, []);
 

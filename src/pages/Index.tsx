@@ -9,20 +9,40 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 
+interface Bookmark {
+  id: number;
+  title: string;
+  url: string;
+  description: string | null;
+  folder_id: number | null;
+  folder?: {
+    id: number;
+    name: string;
+  } | null;
+}
+
+interface FormData {
+  title: string;
+  url: string;
+  description: string;
+  folder_id: number | null;
+  tags: string;
+}
+
 export default function Index() {
-  const [bookmarks, setBookmarks] = useState([]);
-  const [folders, setFolders] = useState([]);
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [folders, setFolders] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFolder, setSelectedFolder] = useState('all');
+  const [selectedFolder, setSelectedFolder] = useState<'all' | number>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingBookmark, setEditingBookmark] = useState(null);
+  const [editingBookmark, setEditingBookmark] = useState<Bookmark | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     title: '',
     url: '',
     description: '',
-    folder_id: '',
+    folder_id: null,
     tags: ''
   });
 
@@ -81,8 +101,8 @@ export default function Index() {
       const bookmarkData = {
         title: formData.title,
         url: formData.url,
-        description: formData.description,
-        folder_id: formData.folder_id || null,
+        description: formData.description || null,
+        folder_id: formData.folder_id,
       };
 
       if (editingBookmark) {
@@ -136,14 +156,14 @@ export default function Index() {
     }
   };
 
-  const handleEdit = (bookmark: any) => {
+  const handleEdit = (bookmark: Bookmark) => {
     setEditingBookmark(bookmark);
     setFormData({
       title: bookmark.title,
       url: bookmark.url,
       description: bookmark.description || '',
-      folder_id: bookmark.folder_id || '',
-      tags: ''  // We'll implement tags later
+      folder_id: bookmark.folder_id,
+      tags: ''
     });
     setIsDialogOpen(true);
   };
@@ -155,7 +175,7 @@ export default function Index() {
       title: '',
       url: '',
       description: '',
-      folder_id: '',
+      folder_id: null,
       tags: ''
     });
   };
@@ -173,7 +193,7 @@ export default function Index() {
     }
   };
 
-  const filteredBookmarks = bookmarks.filter((bookmark: any) => {
+  const filteredBookmarks = bookmarks.filter((bookmark: Bookmark) => {
     const matchesSearch = bookmark.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       bookmark.url.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFolder = selectedFolder === 'all' || bookmark.folder_id === selectedFolder;
@@ -232,8 +252,8 @@ export default function Index() {
               <label className="text-sm font-medium">Folder</label>
               <select
                 className="w-full p-2 border rounded-md"
-                value={formData.folder_id}
-                onChange={(e) => setFormData({ ...formData, folder_id: e.target.value })}
+                value={formData.folder_id || ''}
+                onChange={(e) => setFormData({ ...formData, folder_id: e.target.value ? Number(e.target.value) : null })}
               >
                 <option value="">No folder</option>
                 {folders.map((folder: any) => (
@@ -280,7 +300,7 @@ export default function Index() {
                     onClick={() => setSelectedFolder(folder.id)}
                   >
                     <Folder className="mr-2 h-4 w-4" />
-                    {folder.name} ({bookmarks.filter((b: any) => b.folder_id === folder.id).length})
+                    {folder.name} ({bookmarks.filter((b: Bookmark) => b.folder_id === folder.id).length})
                   </Button>
                 ))}
               </div>
@@ -306,7 +326,7 @@ export default function Index() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {filteredBookmarks.map((bookmark: any) => (
+                {filteredBookmarks.map((bookmark: Bookmark) => (
                   <Card key={bookmark.id} className="p-4">
                     <div className="flex justify-between items-start">
                       <div>

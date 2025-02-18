@@ -9,6 +9,36 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      bookmark_tags: {
+        Row: {
+          bookmark_id: number
+          tag_id: number
+        }
+        Insert: {
+          bookmark_id: number
+          tag_id: number
+        }
+        Update: {
+          bookmark_id?: number
+          tag_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookmark_tags_bookmark_id_fkey"
+            columns: ["bookmark_id"]
+            isOneToOne: false
+            referencedRelation: "bookmarks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookmark_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bookmarks: {
         Row: {
           created_at: string | null
@@ -20,6 +50,7 @@ export type Database = {
           title: string
           updated_at: string | null
           url: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -31,6 +62,7 @@ export type Database = {
           title: string
           updated_at?: string | null
           url: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -42,6 +74,7 @@ export type Database = {
           title?: string
           updated_at?: string | null
           url?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -59,18 +92,42 @@ export type Database = {
           id: number
           name: string
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           created_at?: string | null
           id?: never
           name: string
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           created_at?: string | null
           id?: never
           name?: string
           updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      tags: {
+        Row: {
+          created_at: string
+          id: number
+          name: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          name: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          name?: string
+          user_id?: string | null
         }
         Relationships: []
       }

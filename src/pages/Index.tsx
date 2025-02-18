@@ -90,7 +90,8 @@ export default function Index() {
           schema: 'public',
           table: 'bookmarks'
         },
-        () => {
+        (payload) => {
+          console.log('Bookmark change received:', payload);
           fetchData();
         }
       )
@@ -101,13 +102,17 @@ export default function Index() {
           schema: 'public',
           table: 'folders'
         },
-        () => {
+        (payload) => {
+          console.log('Folder change received:', payload);
           fetchData();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Subscription status:', status);
+      });
 
     return () => {
+      console.log('Cleaning up subscription');
       supabase.removeChannel(channel);
     };
   }, []);
